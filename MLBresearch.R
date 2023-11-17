@@ -509,3 +509,27 @@ grid.arrange(count_plot00 ,count_plot002, count_plot30 ,count_plot302,
              count_plot312, count_plot31, nrow = 5)
 
 data2022 %>% filter(STATE == "111 0") %>% filter(max(c30, c31) == 1) -> df
+
+
+filtered_data <- subset(data2022, EVENT_CD == 15 & c31 == TRUE & STATE == "011 1")
+filtered_data2 <- subset(data2022, c31 == TRUE & STATE == "011 1")
+filtered_data3 <- subset(data2022, EVENT_CD == 15 & c30 == TRUE & STATE == "001 2")
+filtered_data4 <- subset(data2022, c30 == TRUE & STATE == "001 2")
+
+num_obs_filtered_data <- nrow(filtered_data)
+
+num_obs_filtered_data2 <- nrow(filtered_data2)
+
+ratio <- num_obs_filtered_data / num_obs_filtered_data2
+ratio
+
+num_obs_filtered_data3 <- nrow(filtered_data3)
+
+num_obs_filtered_data4 <- nrow(filtered_data4)
+
+ratio2 <- num_obs_filtered_data3 / num_obs_filtered_data4
+ratio2
+
+#3-0  001 2
+#3-1 011 1
+
