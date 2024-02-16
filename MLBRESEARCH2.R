@@ -46,9 +46,19 @@ baseball_seasonswalks <- baseball_seasons %>%
   mutate(midpa2 =ifelse(IBB, as.numeric(str_detect(PITCH_SEQ_TX, "[^VNa-z\\.]")), 0)) %>% 
   mutate(HOME_TEAM_ID = ifelse(BAT_HOME_ID == 1, substr(GAME_ID, 1, 3), NA)) %>% 
   mutate(AWAY_TEAM_ID2 = ifelse(BAT_HOME_ID == 0, substr(AWAY_TEAM_ID, 1, 3), NA)) %>% 
-  mutate(MATCHUP = paste(BAT_HAND_CD, PIT_HAND_CD))
+  mutate(MATCHUP = paste(BAT_HAND_CD, PIT_HAND_CD)) %>% 
 
 
+
+IBB_frequency <- baseball_seasonswalks %>%
+  group_by(MATCHUP, SEASON) %>%
+  summarize(IBB_freq = mean(IBB, na.rm = TRUE))
+
+
+midpa_frequency <- baseball_seasonswalks %>%
+  filter(IBB) %>%
+  group_by(MATCHUP, SEASON) %>%
+  summarize(midpa_freq = mean(midpa > 0, na.rm = TRUE))
 
 
 
@@ -250,3 +260,134 @@ combined_plot_ibb <- ggplot(combined_ibb_data, aes(x = as.factor(SEASON))) +
 
 print(combined_plot_ibb)
 
+
+## ADDING COUNTS and BASERUNNERS
+
+baseball_seasonswalks <- baseball_seasonswalks %>% 
+  mutate(RUNS =  AWAY_SCORE_CT + HOME_SCORE_CT,
+         HALF.INNING = paste(GAME_ID, INN_CT, BAT_HOME_ID),
+         RUNS.SCORED = (BAT_DEST_ID > 3) + (RUN1_DEST_ID > 3) +
+           (RUN2_DEST_ID > 3) + (RUN3_DEST_ID > 3)) 
+
+baseball_seasonswalks %>% 
+  group_by(HALF.INNING) %>% 
+  summarize(Outs.Inning = sum(EVENT_OUTS_CT),
+            Runs.Inning = sum(RUNS.SCORED),
+            Runs.Start = first(RUNS),
+            MAX.RUNS = Runs.Inning + Runs.Start) -> half_innings
+
+baseball_seasonswalks %>%  inner_join(half_innings, by = "HALF.INNING") %>% 
+  mutate(RUNS.ROI = MAX.RUNS - RUNS) -> baseball_seasonswalks
+
+baseball_seasonswalks %>% 
+  mutate(BASES = paste(ifelse(BASE1_RUN_ID > '', 1, 0),
+                       ifelse(BASE2_RUN_ID > '', 1, 0),
+                       ifelse(BASE3_RUN_ID > '', 1, 0), sep = ""),
+         STATE = paste(BASES, OUTS_CT)) -> baseball_seasonswalks
+
+baseball_seasonswalks %>% 
+  mutate(NRUNNER1 = 
+           as.numeric(RUN1_DEST_ID == 1 | BAT_DEST_ID == 1),
+         NRUNNER2 =
+           as.numeric(RUN1_DEST_ID == 2 | RUN2_DEST_ID == 2 |
+                        BAT_DEST_ID == 2),
+         NRUNNER3 =
+           as.numeric(RUN1_DEST_ID == 3 | RUN2_DEST_ID == 3 |
+                        RUN3_DEST_ID == 3 | BAT_DEST_ID == 3),
+         NOUTS = OUTS_CT + EVENT_OUTS_CT,
+         NEW.BASES = paste(NRUNNER1, NRUNNER2,
+                           NRUNNER3, sep = ""),
+         NEW.STATE = paste(NEW.BASES, NOUTS)) -> baseball_seasonswalks
+
+baseball_seasonswalks %>% 
+  filter(STATE != NEW.STATE | (RUNS.SCORED > 0)) -> baseball_seasonswalks
+
+baseball_seasonswalks %>% 
+  filter(Outs.Inning == 3) -> baseball_seasonswalksC 
+
+baseball_seasonswalksC %>% 
+  group_by(STATE) %>% 
+  summarize(Mean = mean(RUNS.ROI)) %>% 
+  mutate(Outs = substr(STATE, 5, 5)) %>% 
+  arrange(Outs) -> RUNS
+
+
+RUNS_out <- matrix(round(RUNS$Mean, 2),8, 3)
+dimnames(RUNS_out)[[2]] <- c("0 outs", "1 out", "2 outs")
+dimnames(RUNS_out)[[1]] <- c("000", "001", "010", "011"
+                             ,"100", "101", "110", "111")
+
+RUNS.2002 <- matrix(c(.51,1.40,1.14,1.96,.90,1.84,1.51,2.33,.27,.94,.68,1.36,.54,1.18,
+                      .94,1.51,.10,.36,.32,.63,.23,.52,.45,.78),8,3)
+dimnames(RUNS.2002) <- dimnames(RUNS_out)
+cbind(RUNS_out, RUNS.2002)
+
+baseball_seasonswalks <- baseball_seasonswalks %>% 
+  mutate(sequence = gsub("[.>123+*N]","",PITCH_SEQ_TX))
+
+baseball_seasonswalks <- baseball_seasonswalks %>% 
+  mutate(c00 = TRUE,
+         c10 = grepl("^[BIPV]", sequence),
+         c01 = grepl("^[CFKLMOQRST]", sequence))
+
+baseball_seasonswalks <- baseball_seasonswalks %>% 
+  mutate(c20 = grepl("^[BIPV]{2}", sequence),
+         c30 = grepl("^[BIPV]{3}", sequence),
+         c02 = grepl("^[CFKLMOQRST]{2}", sequence))
+b <- "[BIPV]"
+s <- "[CFKLMOQRST]"
+baseball_seasonswalks <- baseball_seasonswalks %>% 
+  mutate(c11 = grepl(paste0("^",s,b,
+                            "|",b,s), sequence),
+         c21 = grepl(paste0("^",s,b,b,
+                            "|",b,s,b,
+                            "|",b,b,s), sequence),
+         c31 = grepl(paste0("^",s,b,b,b,
+                            "|",b,s,b,b,
+                            "|",b,b,s,b,
+                            "|",b,b,b,s), sequence))
+baseball_seasonswalks <- baseball_seasonswalks %>% 
+  mutate(c12 = grepl(paste0("^", b, s, s,
+                            "|", s, b, s,
+                            "l", s, s, "[FR]*", b), sequence),
+         c22 = grepl(paste0("^",b,b,s,s,
+                            "|",b,s,b,s,
+                            "|",b,s,s,"[FR]*",b,
+                            "|", s,b,b,s,
+                            "|",s,b,s,"[FR]*", b,
+                            "|",s,s,"[FR]*",b,"[FR]*",b),
+                     sequence),
+         c32 = grepl(paste0("^", s, "*", b, s,
+                            "*", b, s, "*", b), sequence)
+         & grepl(paste0("^",b,"*",s,b,"*",s),
+                 sequence))
+baseball_seasonswalks %>% mutate(abs_score_diff = abs(AWAY_SCORE_CT - HOME_SCORE_CT)) -> baseball_seasonswalks
+
+baseball_seasonswalks %>% select(STATE, IBB) %>% 
+  table
+
+baseball_seasonswalks %>% filter(STATE== "000 0", midpa==1)
+
+
+
+top_occurrences <- baseball_seasonswalks %>% 
+  filter(IBB) %>%
+  select(STATE, INN_CT, IBB) %>%
+  table() %>%
+  as.data.frame() %>%
+  arrange(desc(Freq)) %>%
+  head(10)
+
+top_occurrences
+
+baseball_seasonswalks %>% select(STATE, midpa) %>% 
+  table
+
+top_occurrences2 <- baseball_seasonswalks %>%
+  filter(midpa == 1) %>%
+  select(STATE, INN_CT, midpa) %>%
+  table() %>%
+  as.data.frame() %>%
+  arrange(desc(Freq)) %>%
+  head(10)
+top_occurrences2
