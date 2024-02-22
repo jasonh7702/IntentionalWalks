@@ -153,7 +153,8 @@ table_result3 <- baseball_seasonswalks %>%
   group_by(MATCHUP, HOME_TEAM_ID) %>%
   summarize(
     IBB_TRUE_Count = sum(IBB == TRUE, na.rm = TRUE),
-    IBB_FALSE_Count = sum(IBB == FALSE, na.rm = TRUE)
+    IBB_FALSE_Count = sum(IBB == FALSE, na.rm = TRUE),
+    FREQUENCY = IBB_TRUE_Count / IBB_FALSE_Count
   )
 
 print(table_result3)
@@ -391,3 +392,15 @@ top_occurrences2 <- baseball_seasonswalks %>%
   arrange(desc(Freq)) %>%
   head(10)
 top_occurrences2
+
+model <- glm(midpa ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binomial, data = baseball_seasonswalks)
+
+summary(model)
+
+model2 <- glm(midpa2 ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binomial, data = baseball_seasonswalks)
+
+summary(model2)
+
+model3 <- glm(IBB ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binomial, data = baseball_seasonswalks)
+
+summary(model3)
