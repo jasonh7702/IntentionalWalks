@@ -46,7 +46,7 @@ baseball_seasonswalks <- baseball_seasons %>%
   mutate(midpa2 =ifelse(IBB, as.numeric(str_detect(PITCH_SEQ_TX, "[^VNa-z\\.]")), 0)) %>% 
   mutate(HOME_TEAM_ID = ifelse(BAT_HOME_ID == 1, substr(GAME_ID, 1, 3), NA)) %>% 
   mutate(AWAY_TEAM_ID2 = ifelse(BAT_HOME_ID == 0, substr(AWAY_TEAM_ID, 1, 3), NA)) %>% 
-  mutate(MATCHUP = paste(BAT_HAND_CD, PIT_HAND_CD)) %>% 
+  mutate(MATCHUP = paste(BAT_HAND_CD, PIT_HAND_CD))
 
 
 
@@ -401,6 +401,7 @@ model2 <- glm(midpa2 ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binom
 
 summary(model2)
 
-model3 <- glm(IBB ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binomial, data = baseball_seasonswalks)
 
-summary(model3)
+
+devtools::install_github("rvlenth/estimability", dependencies = TRUE)
+
