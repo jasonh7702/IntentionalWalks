@@ -38,6 +38,10 @@
 #
 #> load("alldata.RData")
 #
+#next, source this file
+#
+#> source("jh_utilities.r")
+#
 #choose a team and year and leave the rest as default
 #
 #> astros.df <- UseTeamDFPitcher("HOU",2019)
