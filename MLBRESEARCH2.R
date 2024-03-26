@@ -37,16 +37,19 @@ tmp <- tmp %>%
 
 #creating new variables for baseball_seasons 
 baseball_seasonswalks <- baseball_seasons %>%
-  mutate(EVENT_15 = EVENT_CD == 15) %>%
-  mutate(SEASON = as.numeric(substr(GAME_ID, 4, 7))) %>%
-  mutate(IBB = str_ends(PITCH_SEQ_TX, "V"),
-         midpa = ifelse(IBB, as.numeric(str_detect(PITCH_SEQ_TX, "[^VNa-z\\.]")), NA),
-         abs_score_diff = ifelse(IBB, abs(AWAY_SCORE_CT - HOME_SCORE_CT), NA),
-         abs_midpa_diff = ifelse(midpa, abs(AWAY_SCORE_CT - HOME_SCORE_CT), NA)) %>% 
-  mutate(midpa2 =ifelse(IBB, as.numeric(str_detect(PITCH_SEQ_TX, "[^VNa-z\\.]")), 0)) %>% 
-  mutate(HOME_TEAM_ID = ifelse(BAT_HOME_ID == 1, substr(GAME_ID, 1, 3), NA)) %>% 
-  mutate(AWAY_TEAM_ID2 = ifelse(BAT_HOME_ID == 0, substr(AWAY_TEAM_ID, 1, 3), NA)) %>% 
-  mutate(MATCHUP = paste(BAT_HAND_CD, PIT_HAND_CD))
+  mutate(
+    EVENT_15 = EVENT_CD == 15,
+    SEASON = as.numeric(substr(GAME_ID, 4, 7)),
+    IBB = str_ends(PITCH_SEQ_TX, "V"),
+    IBB = ifelse(EVENT_CD != 14, IBB, NA),
+    midpa = ifelse(IBB, as.numeric(str_detect(PITCH_SEQ_TX, "[^VNa-z\\.]")), NA),
+    abs_score_diff = ifelse(IBB, abs(AWAY_SCORE_CT - HOME_SCORE_CT), NA),
+    abs_midpa_diff = ifelse(midpa, abs(AWAY_SCORE_CT - HOME_SCORE_CT), NA),
+    midpa2 = ifelse(IBB, as.numeric(str_detect(PITCH_SEQ_TX, "[^VNa-z\\.]")), 0),
+    HOME_TEAM_ID = ifelse(BAT_HOME_ID == 1, substr(GAME_ID, 1, 3), NA),
+    AWAY_TEAM_ID2 = ifelse(BAT_HOME_ID == 0, substr(AWAY_TEAM_ID, 1, 3), NA),
+    MATCHUP = paste(BAT_HAND_CD, PIT_HAND_CD)
+  )
 
 
 
@@ -393,15 +396,97 @@ top_occurrences2 <- baseball_seasonswalks %>%
   head(10)
 top_occurrences2
 
-model <- glm(midpa ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binomial, data = baseball_seasonswalks)
+library(emmeans)
+baseball_seasonswalks %>% select(midpa) %>% table
 
-summary(model)
 
 model2 <- glm(midpa2 ~ STATE + INN_CT + abs_score_diff + MATCHUP, family = binomial, data = baseball_seasonswalks)
 
 summary(model2)
 
 
+emm <- emmeans(model2, ~ STATE + as.factor(INN_CT) + as.factor(abs_score_diff) + MATCHUP)
 
-devtools::install_github("rvlenth/estimability", dependencies = TRUE)
+summary(emm)
+
+
+
+
+baseball_seasonswalks <- baseball_seasonswalks %>%
+  mutate(INN_CT_category = case_when(
+    INN_CT == 9 ~ "9th inning",
+    INN_CT == 8 ~ "8th inning",
+    TRUE ~ "Other"
+  )) %>%
+  mutate(abs_score_diff_category = ifelse(abs_score_diff > 4, "More than 4 runs", "4 or fewer runs"))
+ 
+
+baseball_seasonswalks %>% select(STATE, IBB) %>% table
+
+baseball_seasonswalks %>%
+  group_by(STATE) %>%
+  filter(sum(IBB, na.rm = TRUE) > 50) %>%
+  select(STATE, IBB) %>% table -> state_table
+
+baseball_seasonswalks %>% 
+  filter(STATE == "011 1" | STATE == "011 2" | STATE == "010 1" | STATE == "010 2") -> filtered_walks
+
+model <- glm(midpa ~ STATE + as.factor(INN_CT_category) + as.factor(abs_score_diff_category) + MATCHUP, family = binomial, data = filtered_walks)
+
+summary(model)
+
+
+emm2 <- emmeans(model, ~ STATE + as.factor(INN_CT_category) + as.factor(abs_score_diff_category) + MATCHUP, type = "response")
+
+summary(emm2)
+
+
+baseball_seasonswalks <- baseball_seasonswalks %>%
+  group_by(GAME_ID, BAT_HOME_ID) %>%
+  mutate(
+    NEXT_BATTER = lead(BAT_ID, default = first(BAT_ID)),
+    NEXT_BATTER_HAND = lead(BAT_HAND_CD, default = first(BAT_HAND_CD)),
+    NEXT_PITCHER_HAND = lead(PIT_HAND_CD, default = first(PIT_HAND_CD)),
+    NEXT_MATCHUP = paste(NEXT_BATTER_HAND, NEXT_PITCHER_HAND),
+    SWITCH_MATCHUP = NEXT_MATCHUP != MATCHUP,
+    NEXTSAME = PIT_HAND_CD == NEXT_BATTER_HAND
+  ) %>%
+  ungroup()
+
+baseball_seasonswalks_2 <- baseball_seasonswalks %>% filter(midpa2 == "1") %>% 
+  select(BAT_ID, PIT_HAND_CD, BAT_HAND_CD, NEXT_BATTER, GAME_ID, BAT_HOME_ID,
+         NEXT_PITCHER_HAND, NEXT_BATTER_HAND, NEXT_MATCHUP, MATCHUP, SWITCH_MATCHUP, PITCH_SEQ_TX, NEXTSAME)
+
+baseball_seasonswalks_3 <- baseball_seasonswalks %>% filter(IBB == TRUE) %>% 
+  select(BAT_ID, PIT_HAND_CD, BAT_HAND_CD, NEXT_BATTER, GAME_ID, BAT_HOME_ID,
+         NEXT_PITCHER_HAND, NEXT_BATTER_HAND, NEXT_MATCHUP, MATCHUP, SWITCH_MATCHUP, PITCH_SEQ_TX, NEXTSAME)
+
+next_matchup_freq <- table(baseball_seasonswalks_3$SWITCH_MATCHUP)
+print(next_matchup_freq)
+
+model_1_fit <- glm(IBB ~ SWITCH_MATCHUP, family = binomial, data = baseball_seasonswalks)
+
+summary(model_1_fit)
+
+emm3 <- emmeans(model_1_fit, ~ SWITCH_MATCHUP, type = "response")
+emm3
+
+#3/25
+baseball_seasonswalks_3 %>% filter(NEXT_BATTER == "renda001") %>% select(BAT_ID, NEXT_BATTER)
+
+top_10_next_batters <- baseball_seasonswalks_2 %>%
+  count(NEXT_BATTER) %>%
+  arrange(desc(n)) %>%
+  head(10)
+
+print(top_10_next_batters)
+
+table(baseball_seasonswalks_3$NEXTSAME)
+
+model_2_fit <- glm(IBB ~ NEXTSAME, family = binomial, data = baseball_seasonswalks)
+
+summary(model_2_fit)
+
+emm4 <- emmeans(model_2_fit, ~ NEXTSAME, type = "response")
+emm4
 
