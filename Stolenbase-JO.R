@@ -114,6 +114,12 @@ s0_2023 <- filtered_data2023 %>% filter(STATE == "100 2")
 
 s0 <- bind_rows(s0_2022, s0_2023)
 
+##################################################################
+# JO Note: Redo run expectancy and everything else you did below #
+# this line separately by year.                                  #
+# Note that I created RUNS_out_2022 and RUNS_out_2023 above      #                              
+##################################################################
+
 #Looking at the transition probabilities
 s0 %>% count(NEW.STATE) %>% 
   mutate(Percentage = n / sum(n) * 100)
@@ -127,10 +133,11 @@ transition_probs <- s0 %>%
 p18_25 <- transition_probs %>% filter(NEW.STATE == "000 3") %>% pull(Percentage) / 100
 p18_19 <- transition_probs %>% filter(NEW.STATE == "010 2") %>% pull(Percentage) / 100
 
+
 #Define run expectancies (R9 and R3)
-R25 <- RUNS_out["000", "0 outs"]
-R19 <- RUNS_out["010", "2 outs"]
-R18 <- RUNS_out["100", "2 outs"]
+#R25 <- RUNS_out["000", "0 outs"]
+#R19 <- RUNS_out["010", "2 outs"]
+#R18 <- RUNS_out["100", "2 outs"]
 
 #Expected return calculation
 expected_return_SB <- (p18_25 * R25 + p18_19 * R19) - R18
