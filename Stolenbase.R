@@ -55,7 +55,7 @@ data2022C %>%
   arrange(Outs) -> RUNS2022
 
 
-RUNS_out <- matrix(round(RUNS$Mean, 2),8, 3)
+RUNS_out_2022 <- matrix(round(RUNS$Mean, 2),8, 3)
 dimnames(RUNS_out)[[2]] <- c("0 outs", "1 out", "2 outs")
 dimnames(RUNS_out)[[1]] <- c("000", "001", "010", "011"
                              ,"100", "101", "110", "111")
@@ -109,7 +109,7 @@ data2023C %>%
   arrange(Outs) -> RUNS2023
 
 
-RUNS_out <- matrix(round(RUNS$Mean, 2),8, 3)
+RUNS_out_2023 <- matrix(round(RUNS$Mean, 2),8, 3)
 dimnames(RUNS_out)[[2]] <- c("0 outs", "1 out", "2 outs")
 dimnames(RUNS_out)[[1]] <- c("000", "001", "010", "011"
                              ,"100", "101", "110", "111")
@@ -122,11 +122,18 @@ filtered_data2022 <- data2022 %>%
 filtered_data2023 <- data2023 %>% 
   filter(EVENT_CD %in% c(4, 6))
 
-#finding the most frequent occurrences
-filtered_data2022 %>% count(STATE) %>% mutate(Percentage = n / sum(n) * 100)
+#finding the most frequent occurrences for each year and combining datasets
+filtered_data2022 %>% 
+  count(NEW.STATE) %>% 
+  mutate(Percentage = n / sum(n) * 100)
 
-filtered_data2023 %>% count(STATE) %>% mutate(Percentage = n / sum(n) * 100)
+filtered_data2023 %>% 
+  count(NEW.STATE) %>% 
+  mutate(Percentage = n / sum(n) * 100)
+
 combined_data <- bind_rows(filtered_data2022, filtered_data2023)
+
+combined_data <- combined_data %>% mutate(SEASON = substr(GAME_ID, 4, 7))
 
 #The most frequent occurrence is "100 2" for both years
 s0_2022 <- filtered_data2022 %>% filter(STATE == "100 2")
@@ -140,21 +147,47 @@ s0 %>% count(NEW.STATE) %>%
   mutate(Percentage = n / sum(n) * 100)
 
 #Calculate transition probabilities from STATE "100 2"
-transition_probs <- s0 %>% 
+transition_probs_2022 <- s0_2022 %>% 
   count(NEW.STATE) %>% 
   mutate(Percentage = n / sum(n) * 100)
 
+transition_probs_2023 <- s0_2023 %>% 
+  count(NEW.STATE) %>% 
+  mutate(Percentage = n / sum(n) * 100)
+
+#Giving dimnames attribute for array
+dimnames(RUNS_out_2022) <- list(
+  c("000", "001", "010", "011", "100", "101", "110", "111"),
+  c("0 outs", "1 out", "2 outs")
+)
+
+dimnames(RUNS_out_2023) <- list(
+  c("000", "001", "010", "011", "100", "101", "110", "111"),
+  c("0 outs", "1 out", "2 outs")
+)
 #Define probabilities (p18,19 and p2,3)
-p18_25 <- transition_probs %>% filter(NEW.STATE == "000 3") %>% pull(Percentage) / 100
-p18_19 <- transition_probs %>% filter(NEW.STATE == "010 2") %>% pull(Percentage) / 100
+p18_25_2022 <- transition_probs_2022 %>% filter(NEW.STATE == "000 3") %>% pull(Percentage) / 100
+p18_19_2022 <- transition_probs_2022 %>% filter(NEW.STATE == "010 2") %>% pull(Percentage) / 100
 
-#Define run expectancies (R9 and R3)
-R25 <- RUNS_out["000", "0 outs"]
-R19 <- RUNS_out["010", "2 outs"]
-R18 <- RUNS_out["100", "2 outs"]
+#Define run expectancies for 2022
+R25_2022 <- RUNS_out_2022["000", "0 outs"]
+R19_2022 <- RUNS_out_2022["010", "2 outs"]
+R18_2022 <- RUNS_out_2022["100", "2 outs"]
 
-#Expected return calculation
-expected_return_SB <- (p18_25 * R25 + p18_19 * R19) - R18
-expected_return_SB
+#Expected return calculation for 2022
+expected_return_SB_2022 <- (p18_25_2022 * R25_2022 + p18_19_2022 * R19_2022) - R18_2022
+expected_return_SB_2022
 
+#Define probabilities for 2023
+p18_25_2023 <- transition_probs_2023 %>% filter(NEW.STATE == "000 3") %>% pull(Percentage) / 100
+p18_19_2023 <- transition_probs_2023 %>% filter(NEW.STATE == "010 2") %>% pull(Percentage) / 100
+
+#Define run expectancies for 2023
+R25_2023 <- RUNS_out_2023["000", "0 outs"]
+R19_2023 <- RUNS_out_2023["010", "2 outs"]
+R18_2023 <- RUNS_out_2023["100", "2 outs"]
+
+#Expected return calculation for 2023
+expected_return_SB_2023 <- (p18_25_2023 * R25_2023 + p18_19_2023 * R19_2023) - R18_2023
+expected_return_SB_2023
 
