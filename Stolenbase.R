@@ -401,3 +401,48 @@ ggplot(expected_returns_df, aes(x = Year, y = Expected_Return_SB)) +
        x = "Year",
        y = "Expected Return SB") +
   theme_minimal()
+
+#Including caught stealing and pickoffs as well.
+#Creating a function that pulls all the percentages for the 2018-2023 seasons for
+#Steals (4), caught stealing (6), pickoffs (8)
+calculate_event_counts <- function(data) {
+  data %>% 
+    filter(EVENT_CD %in% c(4, 6, 8)) %>% 
+    count(EVENT_CD) %>% 
+    mutate(Percentage = n / sum(n) * 100)
+}
+
+steals_2018 <- calculate_event_counts(data2018)
+steals_2019 <- calculate_event_counts(data2019)
+steals_2020 <- calculate_event_counts(data2020)
+steals_2021 <- calculate_event_counts(data2021)
+steals_2022 <- calculate_event_counts(data2022)
+steals_2023 <- calculate_event_counts(data2023)
+
+#Extract the percentage of steals for each year to see if there are 
+#any trends in the percentage of successful stolen base attempts.
+percentage_event_4 <- function(event_counts, year) {
+  event_counts %>% 
+    filter(EVENT_CD == 4) %>% 
+    select(Percentage) %>% 
+    mutate(Year = year)
+}
+
+percentage_2018 <- percentage_event_4(steals_2018, 2018)
+percentage_2019 <- percentage_event_4(steals_2019, 2019)
+percentage_2020 <- percentage_event_4(steals_2020, 2020)
+percentage_2021 <- percentage_event_4(steals_2021, 2021)
+percentage_2022 <- percentage_event_4(steals_2022, 2022)
+percentage_2023 <- percentage_event_4(steals_2023, 2023)
+
+percentage_data <- bind_rows(percentage_2018, percentage_2019, percentage_2020,
+                             percentage_2021, percentage_2022, percentage_2023)
+
+#Plot the line graph
+ggplot(percentage_data, aes(x = Year, y = Percentage)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Percentage of EVENT_CD 4 from 2018 to 2023",
+       x = "Year",
+       y = "Percentage of EVENT_CD 4") +
+  theme_minimal()
