@@ -490,3 +490,6 @@ summary(model_2_fit)
 emm4 <- emmeans(model_2_fit, ~ NEXTSAME, type = "response")
 emm4
 
+
+glm(IBB ~ BAT_HAND_CD*PIT_HAND_CD+ INN_CT + STATE + within1 + , family="binomial", data = data2023)
+

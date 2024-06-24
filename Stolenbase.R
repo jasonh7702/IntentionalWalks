@@ -124,11 +124,11 @@ filtered_data2023 <- data2023 %>%
 
 #finding the most frequent occurrences for each year and combining datasets
 filtered_data2022 %>% 
-  count(NEW.STATE) %>% 
+  count(STATE) %>% 
   mutate(Percentage = n / sum(n) * 100)
 
 filtered_data2023 %>% 
-  count(NEW.STATE) %>% 
+  count(STATE) %>% 
   mutate(Percentage = n / sum(n) * 100)
 
 combined_data <- bind_rows(filtered_data2022, filtered_data2023)
@@ -445,4 +445,55 @@ ggplot(percentage_data, aes(x = Year, y = Percentage)) +
   labs(title = "Percentage of EVENT_CD 4 from 2018 to 2023",
        x = "Year",
        y = "Percentage of EVENT_CD 4") +
+  theme_minimal()
+
+#We want to find all the expected returns for the 2nd most frequent SB Attempt
+calculate_expected_return <- function(filtered_data, RUNS_out, year) {
+  s1 <- filtered_data %>% filter(STATE == "100 1")
+  
+  transition_probs <- s1 %>% 
+    count(NEW.STATE) %>% 
+    mutate(Percentage = n / sum(n) * 100)
+  
+  p10_17 <- transition_probs %>% filter(NEW.STATE == "000 2") %>% pull(Percentage) / 100
+  p10_11 <- transition_probs %>% filter(NEW.STATE == "010 1") %>% pull(Percentage) / 100
+  p10_12 <- transition_probs %>% filter(NEW.STATE == "001 1") %>% pull(Percentage) / 100
+  
+  R17 <- RUNS_out["000", "2 outs"]
+  R11 <- RUNS_out["010", "1 out"]
+  R10 <- RUNS_out["100", "1 out"]
+  R12 <- RUNS_out["001", "1 out"]
+  
+  expected_return <- (p10_17 * R17 + p10_11 * R11 + p10_12 * R12) - R10
+  return(expected_return)
+}
+
+#Calculate expected returns for each year
+expected_return2_SB_2018 <- calculate_expected_return(filtered_data2018, RUNS_out_2018, 2018)
+expected_return2_SB_2019 <- calculate_expected_return(filtered_data2019, RUNS_out_2019, 2019)
+expected_return2_SB_2020 <- calculate_expected_return(filtered_data2020, RUNS_out_2020, 2020)
+expected_return2_SB_2021 <- calculate_expected_return(filtered_data2021, RUNS_out_2021, 2021)
+expected_return2_SB_2022 <- calculate_expected_return(filtered_data2022, RUNS_out_2022, 2022)
+expected_return2_SB_2023 <- calculate_expected_return(filtered_data2023, RUNS_out_2023, 2023)
+
+#Combine the expected returns into a dataframe
+expected_returns_df2 <- data.frame(
+  Year = 2018:2023,
+  Expected_Return2_SB = c(
+    expected_return2_SB_2018, 
+    expected_return2_SB_2019, 
+    expected_return2_SB_2020, 
+    expected_return2_SB_2021, 
+    expected_return2_SB_2022, 
+    expected_return2_SB_2023
+  )
+)
+print(expected_returns_df2)
+#Creating a visual to see a trend in the data. The expected value seems to go up
+ggplot(expected_returns_df2, aes(x = Year, y = Expected_Return2_SB)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Expected Return of a Stolen Base Attempt (2018-2023)",
+       x = "Year",
+       y = "Expected Return SB") +
   theme_minimal()
