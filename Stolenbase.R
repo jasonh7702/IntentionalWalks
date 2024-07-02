@@ -54,10 +54,10 @@ data2022C %>%
   mutate(Outs = substr(STATE, 5, 5)) %>% 
   arrange(Outs) -> RUNS2022
 
-
-RUNS_out_2022 <- matrix(round(RUNS$Mean, 2),8, 3)
-dimnames(RUNS_out)[[2]] <- c("0 outs", "1 out", "2 outs")
-dimnames(RUNS_out)[[1]] <- c("000", "001", "010", "011"
+#corrected runs2022$mean
+RUNS_out_2022 <- matrix(round(RUNS2022$Mean, 2),8, 3)
+dimnames(RUNS_out_2022)[[2]] <- c("0 outs", "1 out", "2 outs")
+dimnames(RUNS_out_2022)[[1]] <- c("000", "001", "010", "011"
                              ,"100", "101", "110", "111")
 #run expectancy matrices for 2023
 
@@ -109,9 +109,9 @@ data2023C %>%
   arrange(Outs) -> RUNS2023
 
 
-RUNS_out_2023 <- matrix(round(RUNS$Mean, 2),8, 3)
-dimnames(RUNS_out)[[2]] <- c("0 outs", "1 out", "2 outs")
-dimnames(RUNS_out)[[1]] <- c("000", "001", "010", "011"
+RUNS_out_2023 <- matrix(round(RUNS2023$Mean, 2),8, 3)
+dimnames(RUNS_out_2023)[[2]] <- c("0 outs", "1 out", "2 outs")
+dimnames(RUNS_out_2023)[[1]] <- c("000", "001", "010", "011"
                              ,"100", "101", "110", "111")
 
 #Filter data2022
@@ -155,16 +155,7 @@ transition_probs_2023 <- s0_2023 %>%
   count(NEW.STATE) %>% 
   mutate(Percentage = n / sum(n) * 100)
 
-#Giving dimnames attribute for array
-dimnames(RUNS_out_2022) <- list(
-  c("000", "001", "010", "011", "100", "101", "110", "111"),
-  c("0 outs", "1 out", "2 outs")
-)
 
-dimnames(RUNS_out_2023) <- list(
-  c("000", "001", "010", "011", "100", "101", "110", "111"),
-  c("0 outs", "1 out", "2 outs")
-)
 #Define probabilities (p18,19 and p2,3)
 p18_25_2022 <- transition_probs_2022 %>% filter(NEW.STATE == "000 3") %>% pull(Percentage) / 100
 p18_19_2022 <- transition_probs_2022 %>% filter(NEW.STATE == "010 2") %>% pull(Percentage) / 100
@@ -226,7 +217,9 @@ addstatevar <- function(df){
            NOUTS = OUTS_CT + EVENT_OUTS_CT,
            NEW.BASES = paste(NRUNNER1, NRUNNER2,
                              NRUNNER3, sep = ""),
-           NEW.STATE = paste(NEW.BASES, NOUTS)) -> df
+           NEW.STATE = paste(NEW.BASES, NOUTS)) -> df 
+
+  df$NEW.STATE <- ifelse(df$NOUTS==3,"3 outs",df$NEW.STATE)
   
   df %>% 
     filter(STATE != NEW.STATE | (RUNS.SCORED > 0)) -> df
@@ -497,3 +490,191 @@ ggplot(expected_returns_df2, aes(x = Year, y = Expected_Return2_SB)) +
        x = "Year",
        y = "Expected Return SB") +
   theme_minimal()
+
+expected_return_SB_2023 <- 
+  (transition_probs_2023$Percentage/100) %*% c(RUNS_out_2023[1,3],0,RUNS_out_2023[2,3],RUNS_out_2023[3,3]) - RUNS_out_2023[5,3]
+#HERE: To compute the expected return for a stolen base attempt in 2022, we use
+expected_return_SB_2022 <- 
+  (transition_probs_2022$Percentage/100) %*% c(0,RUNS_out_2022[2,3],RUNS_out_2022[3,3]) - RUNS_out_2022[5,3]
+
+
+data2023.states <- addstatevar(data2023)
+data2023.states %>% select(NEW.STATE) %>% table %>% names -> state.names
+filtered_data2023 <- data2023 %>%
+  filter(EVENT_CD %in% c(4, 6))
+s0_2023 <- filtered_data2023 %>% filter("STATE" == "100 2")
+s0_2023 <- filtered_data2023 %>% filter("STATE" == "100 2")
+filtered_data2023 <- data2023.states %>%
+  filter(EVENT_CD %in% c(4, 6))
+s0_2023 <- filtered_data2023 %>% filter(STATE == "100 2")
+s0_2023 %>% mutate(NEW.STATE.FACTOR = factor(NEW.STATE,levels=state.names)) -> s0_2023
+s0_2023 %>% select(NEW.STATE.FACTOR) %>% table %>% prop.table -> transition_probs_2023
+transition_probs_2023
+
+source("RunExp-fcn.r")
+Rmtx.2023 <- runExpMtx(data2023)
+as.vector(t(Rmatrix.2023))
+
+data2023.states <- addstatevar(data2023)
+tmp2 <- ifelse(d23$NOUTS==3,"3 outs",d23$NEW.STATE)
+tmp2 %>% table
+
+c(as.vector(t(Rmtx.2023)),0) %*% transition_probs_2023
+
+
+data2018.states <- addstatevar(data2018)
+data2019.states <- addstatevar(data2019)
+data2020.states <- addstatevar(data2020)
+data2021.states <- addstatevar(data2021)
+data2022.states <- addstatevar(data2022)
+data2023.states <- addstatevar(data2023)
+
+calculate_transition_probs <- function(data.states, state_filter) {
+  #Filter data for specific event codes
+  filtered_data <- data.states %>%
+    filter(EVENT_CD %in% c(4, 6))
+  
+  #Calculate transition probabilities for the given state
+  s0 <- filtered_data %>% filter(STATE == state_filter)
+  state.names <- data.states %>% select(NEW.STATE) %>% table %>% names
+  s0 <- s0 %>% mutate(NEW.STATE.FACTOR = factor(NEW.STATE, levels = state.names))
+  transition_probs <- s0 %>% select(NEW.STATE.FACTOR) %>% table %>% prop.table
+  
+  return(transition_probs)
+}
+
+#Apply the function for each year
+transition_probs_2018 <- calculate_transition_probs(data2018.states, "100 2")
+transition_probs_2019 <- calculate_transition_probs(data2019.states, "100 2")
+transition_probs_2020 <- calculate_transition_probs(data2020.states, "100 2")
+transition_probs_2021 <- calculate_transition_probs(data2021.states, "100 2")
+transition_probs_2022 <- calculate_transition_probs(data2022.states, "100 2")
+transition_probs_2023 <- calculate_transition_probs(data2023.states, "100 2")
+
+#Function to calculate expected return
+calculate_expected_return <- function(transition_probs, Rmatrix) {
+  #Ensure Rmatrix is a vector
+  Rvector <- as.vector(t(Rmatrix))
+  
+  #Calculate expected return
+  expected_return <- c(Rvector, 0) %*% transition_probs
+  return(expected_return)
+}
+
+#Assuming runExpMtx is the function to generate the run expectancy matrix
+Rmtx_2018 <- runExpMtx(data2018)
+Rmtx_2019 <- runExpMtx(data2019)
+Rmtx_2020 <- runExpMtx(data2020)
+Rmtx_2021 <- runExpMtx(data2021)
+Rmtx_2022 <- runExpMtx(data2022)
+Rmtx_2023 <- runExpMtx(data2023)
+
+#Calculate expected returns
+expected_return_2018 <- calculate_expected_return(transition_probs_2018, Rmtx_2018)
+expected_return_2019 <- calculate_expected_return(transition_probs_2019, Rmtx_2019)
+expected_return_2020 <- calculate_expected_return(transition_probs_2020, Rmtx_2020)
+expected_return_2021 <- calculate_expected_return(transition_probs_2021, Rmtx_2021)
+expected_return_2022 <- calculate_expected_return(transition_probs_2022, Rmtx_2022)
+expected_return_2023 <- calculate_expected_return(transition_probs_2023, Rmtx_2023)
+
+#Combine the expected returns into a dataframe
+expected_returns_df <- data.frame(
+  Year = 2018:2023,
+  Expected_Return_SB = c(
+    expected_return_2018, 
+    expected_return_2019, 
+    expected_return_2020, 
+    expected_return_2021, 
+    expected_return_2022, 
+    expected_return_2023
+  )
+)
+
+print(expected_returns_df)
+
+ggplot(expected_returns_df, aes(x = Year, y = Expected_Return_SB)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Expected Return of a Stolen Base Attempt (2018-2023)",
+       x = "Year",
+       y = "Expected Return SB") +
+  theme_minimal()
+
+#Repeating this process for 100 1 
+transition_probs2_2018 <- calculate_transition_probs(data2018.states, "100 1")
+transition_probs2_2019 <- calculate_transition_probs(data2019.states, "100 1")
+transition_probs2_2020 <- calculate_transition_probs(data2020.states, "100 1")
+transition_probs2_2021 <- calculate_transition_probs(data2021.states, "100 1")
+transition_probs2_2022 <- calculate_transition_probs(data2022.states, "100 1")
+transition_probs2_2023 <- calculate_transition_probs(data2023.states, "100 1")
+
+#Calculate expected returns
+expected_return2_2018 <- calculate_expected_return(transition_probs2_2018, Rmtx_2018)
+expected_return2_2019 <- calculate_expected_return(transition_probs2_2019, Rmtx_2019)
+expected_return2_2020 <- calculate_expected_return(transition_probs2_2020, Rmtx_2020)
+expected_return2_2021 <- calculate_expected_return(transition_probs2_2021, Rmtx_2021)
+expected_return2_2022 <- calculate_expected_return(transition_probs2_2022, Rmtx_2022)
+expected_return2_2023 <- calculate_expected_return(transition_probs2_2023, Rmtx_2023)
+
+#Combine the expected returns into a dataframe
+expected_returns2_df <- data.frame(
+  Year = 2018:2023,
+  Expected_Return_SB = c(
+    expected_return2_2018, 
+    expected_return2_2019, 
+    expected_return2_2020, 
+    expected_return2_2021, 
+    expected_return2_2022, 
+    expected_return2_2023
+  )
+)
+
+print(expected_returns2_df)
+
+ggplot(expected_returns2_df, aes(x = Year, y = Expected_Return_SB)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Expected Return of a Stolen Base Attempt (2018-2023)",
+       x = "Year",
+       y = "Expected Return SB") +
+  theme_minimal()
+
+#Repeating this process for 100 0 
+transition_probs3_2018 <- calculate_transition_probs(data2018.states, "100 0")
+transition_probs3_2019 <- calculate_transition_probs(data2019.states, "100 0")
+transition_probs3_2020 <- calculate_transition_probs(data2020.states, "100 0")
+transition_probs3_2021 <- calculate_transition_probs(data2021.states, "100 0")
+transition_probs3_2022 <- calculate_transition_probs(data2022.states, "100 0")
+transition_probs3_2023 <- calculate_transition_probs(data2023.states, "100 0")
+
+#Calculate expected returns
+expected_return3_2018 <- calculate_expected_return(transition_probs3_2018, Rmtx_2018)
+expected_return3_2019 <- calculate_expected_return(transition_probs3_2019, Rmtx_2019)
+expected_return3_2020 <- calculate_expected_return(transition_probs3_2020, Rmtx_2020)
+expected_return3_2021 <- calculate_expected_return(transition_probs3_2021, Rmtx_2021)
+expected_return3_2022 <- calculate_expected_return(transition_probs3_2022, Rmtx_2022)
+expected_return3_2023 <- calculate_expected_return(transition_probs3_2023, Rmtx_2023)
+
+#Combine the expected returns into a dataframe
+expected_returns3_df <- data.frame(
+  Year = 2018:2023,
+  Expected_Return_SB = c(
+    expected_return3_2018, 
+    expected_return3_2019, 
+    expected_return3_2020, 
+    expected_return3_2021, 
+    expected_return3_2022, 
+    expected_return3_2023
+  )
+)
+
+print(expected_returns3_df)
+
+ggplot(expected_returns3_df, aes(x = Year, y = Expected_Return_SB)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Expected Return of a Stolen Base Attempt (2018-2023)",
+       x = "Year",
+       y = "Expected Return SB") +
+  theme_minimal()
+          
