@@ -1,4 +1,5 @@
-load("/home/jaosborn/research/sports/mlb/parkfactors/datafiles/retrosheet/data2023.Rdata")
+load("/home/jaosborn/research/sports/mlb/parkfactors/datafiles/retrosheet/data2023.RData")
+
 source("addstatevar.R")
 data2023.states <- addstatevar(data2023)
 data2023.states %>% select(NEW.STATE) %>% table %>% names -> state.names
