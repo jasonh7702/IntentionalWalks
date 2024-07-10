@@ -2,7 +2,7 @@
 #source("define-state-names.r")
 #source("addstatevar.r")
 #source("RunExp-fcn.r")
-#source("sbaReturn1002.r") # function is called "sba.return.1002()"
+#source("sba1002.R") # function is called "sba.return.1002()"
 
 
 returns.mtx <- c(season=integer(),state=character(),runExp = double(), runExp.sba=double(),sbaReturn = double())
