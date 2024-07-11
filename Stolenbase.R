@@ -63,11 +63,6 @@ source("RunExp-fcn.r")
 Rmtx.2023 <- runExpMtx(data2023)
 as.vector(t(Rmtx.2023))
 
-data2023.states <- addstatevar(data2023)
-tmp2 <- ifelse(data2023.states$NOUTS==3,"3 outs",data2023.states$NEW.STATE)
-tmp2 %>% table
-
-c(as.vector(t(Rmtx.2023)),0) %*% transition_probs_2023
 
 
 calculate_transition_probs <- function(data.states, state_filter) {
@@ -221,3 +216,46 @@ ggplot(expected_returns3_df, aes(x = Year, y = Expected_Return_SB)) +
           
 # Save the dataframe to a CSV file
 write.csv(expected_returns3_df, "expected_returns3_df.csv", row.names = FALSE)
+
+#Adding a function to compute returns on stolen base attempts
+sba.return.1002 <- function(df)
+{
+  Rmtx <- runExpMtx(df)
+  df.states <- addstatevar(df)
+  df.states %>% filter(EVENT_CD %in% c(4,6)) -> df.states.sba
+  
+  # 2) mutate NEW.STATE into a new factor called NEW.STATE.FACTOR
+  df.states.sba %>% mutate(NEW.STATE.FACTOR = factor(NEW.STATE,levels=state.names)) -> 
+    df.states.sba
+  
+  # 3) obtain relative frequencies (including 0s) for all 25 states
+  #    save as "transition_probs_2023"
+  df.states.sba %>% filter(STATE=="100 2") -> df.states.sba.1002
+  df.states.sba.1002 %>% select(NEW.STATE.FACTOR) %>% table %>% 
+    prop.table  -> tpm.1002 #transition probability mtx as vector
+  Rmtx.1002 <- tpm.1002 %*% c(as.vector(Rmtx),0) + 1*tpm.1002[17]
+  sbaReturn.1002 <- Rmtx.1002  - Rmtx[2,3] 
+  return(list(state="100 2",tpm=tpm.1002,runExp=Rmtx[2,3],runExp.sba=Rmtx.1002,sba.return=sbaReturn.1002))
+}
+
+
+
+data2023.states <- addstatevar(data2023)
+data2023.states %>% select(NEW.STATE) %>% table %>% names -> state.names
+oindx <- c(1,13,7,4,19,16,10,22,1+c(1,13,7,4,19,16,10,22),2+c(1,13,7,4,19,16,10,22),25)
+state.names <- state.names[oindx]
+
+returns.mtx <- c(season=integer(),state=character(),runExp = double(), runExp.sba=double(),sbaReturn = double())
+
+for(season in 2018:2023){
+  fn <- paste0("data",season,".RData")
+  load(fn)
+  df <- get(paste0("data",season))
+  out.list <- sba.return.1002(df)
+  datarow <- c(season=season,state=out.list$state,runExp = out.list$runExp, runExp.sba=out.list$runExp.sba,sbaReturn = out.list$sba.return)
+  returns.mtx <- rbind(returns.mtx,datarow)
+}
+returns.df <- data.frame(returns.mtx)
+row.names(returns.df) <- NULL
+print(returns.df)
+
