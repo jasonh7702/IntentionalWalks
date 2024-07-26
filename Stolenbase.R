@@ -322,7 +322,7 @@ sba.return.1001 <- function(df)
   df.states.sba %>% filter(STATE == "100 1") -> df.states.sba.1001
   df.states.sba.1001 %>% select(NEW.STATE.FACTOR) %>% table %>% prop.table -> tpm.1001 # Transition probability matrix as vector
   
-  Rmtx.1001 <- tpm.1001 %*% c(as.vector(Rmtx), 0) + 1 * tpm.1001[17]
+  Rmtx.1001 <- tpm.1001 %*% c(as.vector(Rmtx), 0) + 1 * tpm.1001[9]
   sbaReturn.1001 <- Rmtx.1001 - Rmtx[2, 2]
   
   return(list(state = "100 1", tpm = tpm.1001, runExp = Rmtx[2, 2], runExp.sba = Rmtx.1001, sba.return = sbaReturn.1001))
@@ -338,6 +338,97 @@ for(season in 2018:2023){
   datarow <- c(season=season,state=out.list$state,runExp = out.list$runExp, runExp.sba=out.list$runExp.sba,sbaReturn = out.list$sba.return)
   returns.mtx <- rbind(returns.mtx,datarow)
 }
-returns.df <- data.frame(returns.mtx)
-row.names(returns.df) <- NULL
-print(returns.df)
+returns.df1001 <- data.frame(returns.mtx)
+row.names(returns.df1001) <- NULL
+print(returns.df1001)
+
+
+#DOUBLE STEALS Research
+data2023.states %>% filter(STATE == "110 1",EVENT_CD %in% c(4,6)) %>% select(EVENT_TX)
+
+data2023.states <- data2023.states %>%
+  mutate(DOUBLE_STEALS = (EVENT_CD %in% c(4, 6)) & grepl("-|;", EVENT_TX)) 
+
+data2023steals <- data2023.states %>% filter(DOUBLE_STEALS == "TRUE", STATE=="110 1") %>% 
+  select(STATE, NEW.STATE, RUNS.ROI, EVENT_CD, EVENT_TX, DOUBLE_STEALS)
+
+data2023nosteals <- data2023.states %>% filter(DOUBLE_STEALS == "FALSE", STATE=="110 1") %>% 
+  select(STATE, NEW.STATE, RUNS.ROI, EVENT_CD, EVENT_TX, DOUBLE_STEALS)
+
+average_runs_roi_2023steals <- data2023steals %>%
+  summarise(average_runs_roi = mean(RUNS.ROI, na.rm = TRUE)) %>%
+  pull(average_runs_roi)
+
+# Calculate the average RUNS.ROI for no double steals
+average_runs_roi_2023nosteals <- data2023nosteals %>%
+  summarise(average_runs_roi = mean(RUNS.ROI, na.rm = TRUE)) %>%
+  pull(average_runs_roi)
+
+# Calculate the difference between the averages
+difference_runs_2023roi <- average_runs_roi_2023steals - average_runs_roi_2023nosteals
+
+#CREATING A LOOP FOR ALL YEARS
+#Initialize a data frame to store the differences
+differences_df <- data.frame(
+  Year = integer(),
+  Difference_RUNS_ROI = double()
+)
+
+averages_df <- data.frame(
+  Year = integer(),
+  Average_RUNS_ROI_Steals = double(),
+  Average_RUNS_ROI_NoSteals = double(),
+  Difference_RUNS_ROI = double()
+)
+
+#Loop through each year from 2018 to 2023
+for (season in 2018:2023) {
+  #Load the data for the current season
+  fn <- paste0("data", season, ".RData")
+  load(fn)
+  df <- get(paste0("data", season))
+  
+  #Add state variables and calculate DOUBLE_STEALS
+  df.states <- addstatevar(df) %>%
+    mutate(DOUBLE_STEALS = (EVENT_CD %in% c(4, 6)) & grepl("-|;", EVENT_TX))
+  
+  #Filter for double steals and no double steals
+  df.steals <- df.states %>% filter(DOUBLE_STEALS == TRUE, STATE == "110 1") %>% 
+    select(STATE, NEW.STATE, RUNS.ROI, EVENT_CD, EVENT_TX, DOUBLE_STEALS)
+  
+  df.nosteals <- df.states %>% filter(DOUBLE_STEALS == FALSE, STATE == "110 1") %>% 
+    select(STATE, NEW.STATE, RUNS.ROI, EVENT_CD, EVENT_TX, DOUBLE_STEALS)
+  
+  #Calculate the average RUNS.ROI for double steals
+  average_runs_roi_steals <- df.steals %>%
+    summarise(average_runs_roi = mean(RUNS.ROI, na.rm = TRUE)) %>%
+    pull(average_runs_roi)
+  
+  #Calculate the average RUNS.ROI for no double steals
+  average_runs_roi_nosteals <- df.nosteals %>%
+    summarise(average_runs_roi = mean(RUNS.ROI, na.rm = TRUE)) %>%
+    pull(average_runs_roi)
+  
+  #Calculate the difference between the averages
+  difference_runs_roi <- average_runs_roi_steals - average_runs_roi_nosteals
+  
+  #Add the result to the data frame
+  averages_df <- rbind(averages_df, data.frame(
+    Year = season, 
+    Average_RUNS_ROI_Steals = average_runs_roi_steals, 
+    Average_RUNS_ROI_NoSteals = average_runs_roi_nosteals, 
+    Difference_RUNS_ROI = difference_runs_roi
+  ))
+}
+
+#Print the results data frame
+print(averages_df)
+
+#Creating a plot that compares the differences across years
+ggplot(differences_df, aes(x = Year, y = Difference_RUNS_ROI)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(title = "Difference in RUNS.ROI for Double Steals vs No Double Steals",
+       x = "Year",
+       y = "Difference in RUNS.ROI") +
+  theme_minimal()
